@@ -28,7 +28,7 @@ bat AS (
 
 SELECT
     visitor_id,
-    visit_date,
+    to_char(visit_date, 'YYYY-MM-DD') as visit_date,
     utm_source,
     utm_medium,
     utm_campaign,
@@ -40,5 +40,4 @@ SELECT
 FROM bat
 WHERE rn = '1'
 ORDER BY
-    amount DESC NULLS LAST, visit_date ASC, utm_source ASC, utm_medium ASC, utm_campaign asc
-limit 10;
+    amount DESC NULLS LAST, visit_date ASC, utm_source ASC, utm_medium ASC, utm_campaign asc;
