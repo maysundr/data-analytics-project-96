@@ -22,7 +22,7 @@ WITH tab AS (
 bat AS (
     SELECT
         *,
-        row_number() OVER (PARTITION BY tab.visitor_id) AS rn
+        row_number() OVER (PARTITION BY tab.visitor_id order by tab.visit_date desc) AS rn
     FROM tab
 )
 
@@ -40,4 +40,5 @@ SELECT
 FROM bat
 WHERE rn = '1'
 ORDER BY
-    amount DESC NULLS LAST, visit_date ASC, utm_source ASC, utm_medium ASC, utm_campaign asc;
+    amount DESC NULLS LAST, visit_date ASC, utm_source ASC, utm_medium ASC, utm_campaign ASC
+--limit 10;
