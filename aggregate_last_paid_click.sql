@@ -58,9 +58,10 @@ tab AS (
 bat AS (
     SELECT
         *,
-        ROW_NUMBER() OVER (PARTITION BY tab.visitor_id) AS rn
+        ROW_NUMBER() OVER (PARTITION BY tab.visitor_id order by tab.visit_date desc) AS rn
     FROM tab
-),
+)
+,
 
 first_step AS (
 
@@ -96,21 +97,13 @@ second_step AS (
         COUNT(first_step.lead_id) AS leads_count,
         SUM(CASE WHEN first_step.status_id = '142' THEN 1 ELSE 0 END)
             AS purchases_count,
-        SUM(first_step.amount) AS revenue
+        SUM(CASE WHEN first_step.status_id = '142' THEN first_step.amount ELSE 0 END) AS revenue
     FROM first_step
     GROUP BY
         first_step.visit_date,
         first_step.utm_source,
         first_step.utm_medium,
-        first_step.utm_campaign,
-        first_step.lead_id
-    ORDER BY
-        first_step.visit_date ASC,
-        visitors_count DESC,
-        first_step.utm_source ASC,
-        first_step.utm_medium ASC,
-        first_step.utm_campaign ASC,
-        revenue DESC NULLS LAST
+        first_step.utm_campaign
 )
 
 SELECT
@@ -140,5 +133,5 @@ GROUP BY
     purchases_count,
     revenue
 ORDER BY
-    visit_date ASC, visitors_count DESC, utm_source ASC, utm_medium ASC, utm_campaign ASC, revenue DESC NULLS LAST;
+    visit_date ASC, visitors_count DESC, utm_source ASC, utm_medium ASC, utm_campaign ASC, revenue DESC NULLS last;
     
