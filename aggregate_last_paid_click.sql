@@ -1,38 +1,36 @@
-WITH tab_1 AS (
-    SELECT
-        TO_CHAR(campaign_date, 'YYYY-MM-DD') AS visit_date,
-        SUM(va.daily_spent) AS cost,
-        utm_source,
-        utm_medium,
-        utm_campaign
-    FROM vk_ads AS va
-    GROUP BY
-        campaign_date, utm_source,
-        utm_medium,
-        utm_campaign
-
-    UNION
-
-    SELECT
-        TO_CHAR(campaign_date, 'YYYY-MM-DD') AS visit_date,
-        SUM(ya.daily_spent) AS cost,
-        utm_source,
-        utm_medium,
-        utm_campaign
-    FROM ya_ads AS ya
-    GROUP BY
-        campaign_date, utm_source,
-        utm_medium,
-        utm_campaign
-),
-
-end_cost AS (
-
+WITH end_cost AS (
     SELECT *
-    FROM tab_1
+    FROM (
+        SELECT
+            TO_CHAR(campaign_date, 'YYYY-MM-DD') AS visit_date,
+            SUM(va.daily_spent) AS cost,
+            utm_source,
+            utm_medium,
+            utm_campaign
+        FROM vk_ads AS va
+        GROUP BY
+            campaign_date, utm_source,
+            utm_medium,
+            utm_campaign
+
+        UNION ALL
+
+        SELECT
+            TO_CHAR(campaign_date, 'YYYY-MM-DD') AS visit_date,
+            SUM(ya.daily_spent) AS cost,
+            utm_source,
+            utm_medium,
+            utm_campaign
+        FROM ya_ads AS ya
+        GROUP BY
+            campaign_date, utm_source,
+            utm_medium,
+            utm_campaign
+    ) AS tab_1
     ORDER BY visit_date
 
-),
+)
+,
 
 tab AS (
     SELECT
@@ -45,7 +43,10 @@ tab AS (
         l.created_at,
         l.amount,
         l.closing_reason,
-        l.status_id
+        l.status_id,
+        ROW_NUMBER()
+            OVER (PARTITION BY s.visitor_id ORDER BY visit_date DESC)
+            AS rn
     FROM sessions AS s
     LEFT JOIN leads AS l
         ON
@@ -54,14 +55,6 @@ tab AS (
     WHERE medium <> 'organic'
     ORDER BY s.visit_date DESC
 ),
-
-bat AS (
-    SELECT
-        *,
-        ROW_NUMBER() OVER (PARTITION BY tab.visitor_id order by tab.visit_date desc) AS rn
-    FROM tab
-)
-,
 
 first_step AS (
 
@@ -76,7 +69,7 @@ first_step AS (
         closing_reason,
         status_id,
         TO_CHAR(visit_date, 'YYYY-MM-DD') AS visit_date
-    FROM bat
+    FROM tab
     WHERE rn = '1'
     ORDER BY
         amount DESC NULLS LAST,
@@ -87,7 +80,6 @@ first_step AS (
 ),
 
 second_step AS (
-
     SELECT
         first_step.visit_date,
         first_step.utm_source,
@@ -97,7 +89,11 @@ second_step AS (
         COUNT(first_step.lead_id) AS leads_count,
         SUM(CASE WHEN first_step.status_id = '142' THEN 1 ELSE 0 END)
             AS purchases_count,
-        SUM(CASE WHEN first_step.status_id = '142' THEN first_step.amount ELSE 0 END) AS revenue
+        SUM(
+            CASE
+                WHEN first_step.status_id = '142' THEN first_step.amount ELSE 0
+            END
+        ) AS revenue
     FROM first_step
     GROUP BY
         first_step.visit_date,
@@ -112,7 +108,7 @@ SELECT
     second_step.utm_source,
     second_step.utm_medium,
     second_step.utm_campaign,
-    SUM(end_cost.cost) AS total_cost,
+    end_cost.cost AS total_cost,
     leads_count,
     purchases_count,
     revenue
@@ -128,10 +124,15 @@ GROUP BY
     second_step.utm_source,
     second_step.utm_medium,
     second_step.utm_campaign,
+    end_cost.cost,
     visitors_count,
     leads_count,
     purchases_count,
     revenue
 ORDER BY
-    visit_date ASC, visitors_count DESC, utm_source ASC, utm_medium ASC, utm_campaign ASC, revenue DESC NULLS last;
-    
+    revenue DESC NULLS LAST,
+	visit_date ASC,
+	visitors_count DESC,
+	second_step.utm_source ASC,
+	utm_medium ASC,
+	utm_campaign ASC;
